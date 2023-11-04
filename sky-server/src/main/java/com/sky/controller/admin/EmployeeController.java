@@ -1,19 +1,21 @@
 package com.sky.controller.admin;
 
 import com.sky.constant.JwtClaimsConstant;
+import com.sky.constant.MessageConstant;
+import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
+import com.sky.dto.EmployeePageQueryDTO;
 import com.sky.entity.Employee;
 import com.sky.properties.JwtProperties;
+import com.sky.result.PageResult;
 import com.sky.result.Result;
 import com.sky.service.EmployeeService;
 import com.sky.utils.JwtUtil;
 import com.sky.vo.EmployeeLoginVO;
+import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +70,45 @@ public class EmployeeController {
      */
     @PostMapping("/logout")
     public Result<String> logout() {
+        return Result.success();
+    }
+
+    @PostMapping("/enroll")
+    @ApiOperation("employee enroll")
+    public Result enroll(@RequestBody EmployeeDTO item) {
+        employeeService.enroll(item);
+        return Result.success();
+    }
+
+    @PostMapping("/pagemation")
+    @ApiOperation("employee pagemation")
+    public Result<PageResult> pagemation(EmployeePageQueryDTO item){
+        PageResult pageResult = employeeService.pagemation(item);
+        return Result.success(pageResult);
+    }
+
+    @PostMapping("/forbidden/{status}")
+    @ApiOperation("employee forbidden")
+    public Result forbidden(@PathVariable Integer status, Long id){
+        employeeService.forbidden(status, id);
+        return Result.success();
+    }
+
+    @PostMapping("/getbyid/{id}")
+    @ApiOperation("employee getbyid")
+    public Result<Employee> getById(@PathVariable Long id){
+        Employee employee = employeeService.getById(id);
+        return Result.success(employee);
+    }
+
+    @PostMapping("/updateEmployeeInfo")
+    @ApiOperation("employee updateEmployeeInfo")
+    public Result updateEmployeeInfo(@RequestBody EmployeeDTO employee){
+        boolean res =  employeeService.updateEmployeeInfo(employee);
+        if (!res){
+            return Result.error(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
         return Result.success();
     }
 
