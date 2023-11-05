@@ -72,12 +72,6 @@ public class EmployeeServiceImpl implements EmployeeService {
         domain.setStatus(StatusConstant.ENABLE);
         domain.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()));
 
-        domain.setCreateTime(LocalDateTime.now());
-        domain.setUpdateTime(LocalDateTime.now());
-
-        domain.setCreateUser(BaseContext.getCurrentId());
-        domain.setUpdateUser(BaseContext.getCurrentId());
-
         employeeMapper.insert(domain);
 
         return domain;
@@ -111,10 +105,17 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         Employee domain = new Employee();
         BeanUtils.copyProperties(employee, domain);
-        domain.setUpdateTime(LocalDateTime.now());
-        domain.setUpdateUser(BaseContext.getCurrentId());
         employeeMapper.updateStatus(domain);
 
+        return true;
+    }
+
+    public boolean delete(Long id) {
+        if (getById(id) == null){
+            return false;
+        }
+
+        employeeMapper.delete(id);
         return true;
     }
 

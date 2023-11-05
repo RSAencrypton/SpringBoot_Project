@@ -24,4 +24,6 @@ public interface EmployeeService {
     Employee getById(Long id);
 
     boolean updateEmployeeInfo(EmployeeDTO employee);
+
+    boolean delete(Long id);
 }

@@ -112,4 +112,15 @@ public class EmployeeController {
         return Result.success();
     }
 
+    @PostMapping("/delete/{id}")
+    @ApiOperation("employee delete")
+    public Result delete(@PathVariable Long id){
+        boolean res = employeeService.delete(id);
+        if (!res){
+            return Result.error(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        return Result.success();
+    }
+
 }
