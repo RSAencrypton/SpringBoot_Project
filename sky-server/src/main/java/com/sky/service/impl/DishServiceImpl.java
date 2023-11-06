@@ -54,6 +54,17 @@ public class DishServiceImpl implements DishService {
         }
     }
 
+    public DishVO GetDishById(Long id) {
+        Dish dish = dishMapper.FindDishById(id);
+        List<DishFlavor> flavors = flavourMapper.GetFlavorByDishId(id);
+
+        DishVO dishVO = new DishVO();
+        BeanUtils.copyProperties(dish, dishVO);
+        dishVO.setFlavors(flavors);
+
+        return dishVO;
+    }
+
     public PageResult GetDishList(DishPageQueryDTO item){
         PageHelper.startPage(item.getPage(), item.getPageSize());
         Page<DishVO> dishList = dishMapper.GetDishList(item);
@@ -81,5 +92,22 @@ public class DishServiceImpl implements DishService {
 
         dishMapper.DeleteDishs(ids);
         flavourMapper.DeleteFlavourByDishIds(ids);
+    }
+
+    public void UpdateDish(DishDTO item) {
+        Dish dish = new Dish();
+        BeanUtils.copyProperties(item, dish);
+        dishMapper.UpdateDish(dish);
+
+        flavourMapper.DeleteFlavourByDishId(item.getId());
+
+
+        List<DishFlavor> flavors = item.getFlavors();
+        if (flavors != null && flavors.size() > 0) {
+            for (DishFlavor flavor : flavors) {
+                flavor.setDishId(item.getId());
+            }
+            flavourMapper.InsertAllFlavour(flavors);
+        }
     }
 }
