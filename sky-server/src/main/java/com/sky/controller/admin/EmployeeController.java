@@ -12,6 +12,7 @@ import com.sky.result.Result;
 import com.sky.service.EmployeeService;
 import com.sky.utils.JwtUtil;
 import com.sky.vo.EmployeeLoginVO;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,7 +81,7 @@ public class EmployeeController {
         return Result.success();
     }
 
-    @PostMapping("/pagemation")
+    @GetMapping("/page")
     @ApiOperation("employee pagemation")
     public Result<PageResult> pagemation(EmployeePageQueryDTO item){
         PageResult pageResult = employeeService.pagemation(item);
