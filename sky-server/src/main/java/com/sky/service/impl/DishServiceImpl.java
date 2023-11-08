@@ -6,9 +6,11 @@ import com.sky.constant.MessageConstant;
 import com.sky.constant.StatusConstant;
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
+import com.sky.entity.Category;
 import com.sky.entity.Dish;
 import com.sky.entity.DishFlavor;
 import com.sky.exception.DeletionNotAllowedException;
+import com.sky.mapper.CategoryMapper;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.FlavourMapper;
 import com.sky.mapper.MealMapper;
@@ -38,10 +40,14 @@ public class DishServiceImpl implements DishService {
     @Autowired
     private MealMapper mealMapper;
 
+    @Autowired
+    private CategoryMapper categoryMapper;
+
     @Transactional
     public void AddDish(DishDTO item) {
         Dish dish = new Dish();
         BeanUtils.copyProperties(item, dish);
+        dish.setStatus(StatusConstant.ENABLE);
         dishMapper.insert(dish);
 
         Long dishId = dish.getId();
@@ -69,6 +75,20 @@ public class DishServiceImpl implements DishService {
         PageHelper.startPage(item.getPage(), item.getPageSize());
         Page<DishVO> dishList = dishMapper.GetDishList(item);
         return new PageResult(dishList.getTotal(), dishList.getResult());
+    }
+
+
+    public List<DishVO> GetDishByCategoryId(Long id) {
+        List<Category> categories = categoryMapper.HasChildren(id);
+        if (categories == null || categories.size() == 0) {
+            return null;
+        }
+
+        Dish dish = new Dish();
+        dish.setCategoryId(id);
+        dish.setStatus(StatusConstant.ENABLE);
+        List<DishVO> dishVOs = dishMapper.GetDishByCategoryId(dish);
+        return dishVOs;
     }
 
     @Transactional
