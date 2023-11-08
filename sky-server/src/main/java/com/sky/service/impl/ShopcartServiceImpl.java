@@ -48,4 +48,29 @@ public class ShopcartServiceImpl implements ShopcartService {
             shopCartMapper.insertItem(shoppingCart);
         }
     }
+
+    public void RemoveOne(Long id) {
+        //获取商品
+        ShoppingCart item = shopCartMapper.GetItemById(id);
+        //判断商品数量是否为0
+        int after = item.getNumber() - 1;
+        if (after == 0) {
+            //0则删除商品
+            shopCartMapper.RemoveOne(item);
+        }else {
+            //不是则只修改数量
+            item.setNumber(after);
+            shopCartMapper.updateItem(item);
+        }
+
+    }
+
+    public List<ShoppingCart> ListCart(Long id){
+        List<ShoppingCart> list = shopCartMapper.ListCart(id);
+        return list;
+    }
+
+    public void DeleteCart(Long id) {
+        shopCartMapper.RemoveAll(id);
+    }
 }
