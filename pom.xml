@@ -39,6 +39,7 @@
                 <version>${mybatis.spring}</version>
             </dependency>
 
+
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
@@ -122,6 +123,7 @@
                 <artifactId>wechatpay-apache-httpclient</artifactId>
                 <version>0.4.8</version>
             </dependency>
+
         </dependencies>
     </dependencyManagement>
 </project>
