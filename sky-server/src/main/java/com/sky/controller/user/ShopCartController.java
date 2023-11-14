@@ -28,6 +28,13 @@ public class ShopCartController {
         return Result.success();
     }
 
+    @PostMapping("/addSpecial")
+    @ApiOperation("添加特价商品到购物车")
+    public Result AddSpecial(@RequestBody ShoppingCartDTO item) {
+        boolean res =  shopcartService.AddSpecial(item);
+        return res == true ? Result.success("抢购成功") : Result.error("抢购失败");
+    }
+
     @PostMapping("/removeOne/{Dishid}")
     @ApiOperation("减少一个商品数量")
     public Result RemoveOne(@PathVariable Long Dishid) {

@@ -2,6 +2,7 @@ package com.sky.service;
 
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
+import com.sky.dto.SpecialDishDto;
 import com.sky.result.PageResult;
 import com.sky.vo.DishVO;
 
@@ -20,4 +21,6 @@ public interface DishService {
     void UpdateDish(DishDTO item);
 
     List<DishVO> GetDishByCategoryId(Long id);
+
+    void AddSpecialDish(SpecialDishDto item);
 }

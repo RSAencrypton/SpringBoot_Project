@@ -14,4 +14,6 @@ public interface ShopcartService {
     void DeleteCart(Long id);
 
     void RemoveOne(Long id);
+
+    boolean AddSpecial(ShoppingCartDTO item);
 }

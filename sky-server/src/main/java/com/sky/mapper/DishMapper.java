@@ -3,13 +3,12 @@ package com.sky.mapper;
 import com.github.pagehelper.Page;
 import com.sky.annotation.AutoFill;
 import com.sky.dto.DishPageQueryDTO;
+import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Dish;
+import com.sky.entity.SpecialDish;
 import com.sky.enumeration.OperationType;
 import com.sky.vo.DishVO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
 
 import java.util.List;
 
@@ -36,6 +35,16 @@ public interface DishMapper {
     void DeleteDish(Long id);
 
     void DeleteDishs(List<Long> ids);
+
+    @Insert("insert into tb_special_dish (stock, description, pay_val, actual_val, begin_time, end_time)" +
+            "values (#{stock}, #{description}, #{payVal}, #{actualVal},  #{begin}, #{end})")
+    void AddSpecialDish(SpecialDishDto dish);
+
+    @Update("update tb_special_dish set stock= stock - 1 where id = #{id}")
+    void RemoveOneSpecialDish(Long id);
+
+    @Select("select * from tb_special_dish where id = #{id}")
+    SpecialDish HasStock(SpecialDish id);
 
 
     @AutoFill(value = OperationType.UPDATE)

@@ -2,6 +2,7 @@ package com.sky.controller.admin;
 
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
+import com.sky.dto.SpecialDishDto;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
 import com.sky.result.Result;
@@ -36,6 +37,14 @@ public class DishController {
 //        CleanRedis(item.getCategoryId());
         return Result.success();
     }
+
+    @PostMapping("/special")
+    @ApiOperation("添加特价菜")
+    public Result AddSpecialDish(@RequestBody SpecialDishDto item) {
+        dishService.AddSpecialDish(item);
+        return Result.success();
+    }
+
 
     @GetMapping("/page")
     @ApiOperation("分页查询菜品列表")

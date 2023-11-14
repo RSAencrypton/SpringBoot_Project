@@ -7,6 +7,7 @@ import com.sky.constant.RedisConstants;
 import com.sky.constant.StatusConstant;
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
+import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Category;
 import com.sky.entity.Dish;
 import com.sky.entity.DishFlavor;
@@ -64,6 +65,10 @@ public class DishServiceImpl implements DishService {
             }
             flavourMapper.InsertAllFlavour(flavors);
         }
+    }
+
+    public void AddSpecialDish(SpecialDishDto item) {
+        dishMapper.AddSpecialDish(item);
     }
 
     public DishVO GetDishById(Long id) {
