@@ -5,6 +5,7 @@ import com.sky.annotation.AutoFill;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Dish;
+import com.sky.entity.ShoppingCart;
 import com.sky.entity.SpecialDish;
 import com.sky.enumeration.OperationType;
 import com.sky.vo.DishVO;
@@ -31,6 +32,9 @@ public interface DishMapper {
     @Select("select * from dish where id = #{id}")
     Dish FindDishById(Long id);
 
+    @Select("select * from shopping_cart where name = #{name} and user_id = #{UserId}")
+    ShoppingCart FindItemByUserIDAndDishName(Long UserId, String name);
+
     @Delete("delete from dish where id = #{id}")
     void DeleteDish(Long id);
 
@@ -40,7 +44,7 @@ public interface DishMapper {
             "values (#{stock}, #{description}, #{payVal}, #{actualVal},  #{begin}, #{end})")
     void AddSpecialDish(SpecialDishDto dish);
 
-    @Update("update tb_special_dish set stock= stock - 1 where id = #{id}")
+    @Update("update tb_special_dish set stock= stock - 1 where id = #{id} and stock > 0")
     void RemoveOneSpecialDish(Long id);
 
     @Select("select * from tb_special_dish where id = #{id}")

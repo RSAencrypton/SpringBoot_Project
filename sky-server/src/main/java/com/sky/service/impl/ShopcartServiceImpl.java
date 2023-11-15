@@ -6,12 +6,15 @@ import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Dish;
 import com.sky.entity.ShoppingCart;
 import com.sky.entity.SpecialDish;
+import com.sky.lock.RedisLock;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.ShopCartMapper;
 import com.sky.service.ShopcartService;
+import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,9 @@ public class ShopcartServiceImpl implements ShopcartService {
 
     @Autowired
     private DishMapper dishMapper;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     private static final Long TEST_USER_ID = 4L;
     public void AddCart(ShoppingCartDTO item) {
@@ -55,7 +61,7 @@ public class ShopcartServiceImpl implements ShopcartService {
         }
     }
 
-    public void AddSpecialIntoCart(ShoppingCartDTO item, int pay) {
+    public boolean AddSpecialIntoCart(ShoppingCartDTO item, int pay) {
         ShoppingCart shoppingCart = new ShoppingCart();
         BeanUtils.copyProperties(item, shoppingCart);
         shoppingCart.setUserId(TEST_USER_ID);
@@ -63,14 +69,24 @@ public class ShopcartServiceImpl implements ShopcartService {
 
         Long dishId = item.getDishId();
         Dish dish = dishMapper.FindDishById(dishId);
+
+        ShoppingCart HasOne = dishMapper.FindItemByUserIDAndDishName(TEST_USER_ID, "特价" + dish.getName());
+
+        if (HasOne != null) {
+            return false;
+        }
+
         shoppingCart.setName("特价" + dish.getName());
         shoppingCart.setAmount(BigDecimal.valueOf(pay));
-
         shoppingCart.setNumber(1);
         shoppingCart.setCreateTime(LocalDateTime.now());
 
         shopCartMapper.insertItem(shoppingCart);
+        dishMapper.RemoveOneSpecialDish(dishId);
+
+        return true;
     }
+
 
     @Transactional
     public boolean AddSpecial(ShoppingCartDTO item) {
@@ -83,10 +99,6 @@ public class ShopcartServiceImpl implements ShopcartService {
             return false;
         }
 
-        System.out.println(specialDish.getBeginTime());
-        System.out.println(specialDish.getEndTime());
-        System.out.println(specialDish.getStock());
-        System.out.println(specialDish.getPayVal());
 
         LocalDateTime begin = specialDish.getBeginTime();
         LocalDateTime end = specialDish.getEndTime();
@@ -101,11 +113,18 @@ public class ShopcartServiceImpl implements ShopcartService {
         if (stock <= 0) {
             return false;
         }
+        RedisLock redisLock = new RedisLock("order:" + TEST_USER_ID, redisTemplate);
+        boolean res = redisLock.TryLock(5L);
 
-        dishMapper.RemoveOneSpecialDish(dishId);
-        AddSpecialIntoCart(item, pay);
+        if (!res) {
+            return false;
+        }
 
-        return true;
+        try {
+            return AddSpecialIntoCart(item, pay);
+        }finally {
+            redisLock.unLock();
+        }
     }
 
     public void RemoveOne(Long id) {
