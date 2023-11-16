@@ -40,8 +40,8 @@ public interface DishMapper {
 
     void DeleteDishs(List<Long> ids);
 
-    @Insert("insert into tb_special_dish (stock, description, pay_val, actual_val, begin_time, end_time)" +
-            "values (#{stock}, #{description}, #{payVal}, #{actualVal},  #{begin}, #{end})")
+    @Insert("insert into tb_special_dish (id,stock, description, pay_val, actual_val, begin_time, end_time)" +
+            "values (#{id},#{stock}, #{description}, #{pay_val}, #{actual_val},  #{begin_time}, #{end_time})")
     void AddSpecialDish(SpecialDishDto dish);
 
     @Update("update tb_special_dish set stock= stock - 1 where id = #{id} and stock > 0")

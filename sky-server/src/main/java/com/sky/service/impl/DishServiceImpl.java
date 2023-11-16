@@ -11,6 +11,7 @@ import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Category;
 import com.sky.entity.Dish;
 import com.sky.entity.DishFlavor;
+import com.sky.entity.SpecialDish;
 import com.sky.exception.DeletionNotAllowedException;
 import com.sky.mapper.CategoryMapper;
 import com.sky.mapper.DishMapper;
@@ -69,6 +70,7 @@ public class DishServiceImpl implements DishService {
 
     public void AddSpecialDish(SpecialDishDto item) {
         dishMapper.AddSpecialDish(item);
+        redisTemplate.opsForValue().set("STOCK:" + item.getId(),item.getStock().toString());
     }
 
     public DishVO GetDishById(Long id) {

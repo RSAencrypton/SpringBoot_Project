@@ -12,15 +12,26 @@ import com.sky.mapper.ShopCartMapper;
 import com.sky.service.ShopcartService;
 import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 @Service
@@ -35,6 +46,19 @@ public class ShopcartServiceImpl implements ShopcartService {
 
     @Autowired
     private RedisTemplate redisTemplate;
+
+    @Autowired
+    private RedissonClient redisson;
+
+    @Autowired
+    private ShopcartServiceImpl shopcartService;
+
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
+    static {
+        SECKILL_SCRIPT = new DefaultRedisScript<>();
+        SECKILL_SCRIPT.setLocation(new ClassPathResource("CheckSpecialDish.lua"));
+        SECKILL_SCRIPT.setResultType(Long.class);
+    }
 
     private static final Long TEST_USER_ID = 4L;
     public void AddCart(ShoppingCartDTO item) {
@@ -61,7 +85,8 @@ public class ShopcartServiceImpl implements ShopcartService {
         }
     }
 
-    public boolean AddSpecialIntoCart(ShoppingCartDTO item, int pay) {
+    @Transactional
+    public void AddSpecialIntoCart(ShoppingCartDTO item) {
         ShoppingCart shoppingCart = new ShoppingCart();
         BeanUtils.copyProperties(item, shoppingCart);
         shoppingCart.setUserId(TEST_USER_ID);
@@ -70,11 +95,11 @@ public class ShopcartServiceImpl implements ShopcartService {
         Long dishId = item.getDishId();
         Dish dish = dishMapper.FindDishById(dishId);
 
-        ShoppingCart HasOne = dishMapper.FindItemByUserIDAndDishName(TEST_USER_ID, "特价" + dish.getName());
+        SpecialDish specialDish = new SpecialDish();
+        specialDish.setId(dishId);
+        specialDish = dishMapper.HasStock(specialDish);
+        int pay = specialDish.getPayVal();
 
-        if (HasOne != null) {
-            return false;
-        }
 
         shoppingCart.setName("特价" + dish.getName());
         shoppingCart.setAmount(BigDecimal.valueOf(pay));
@@ -83,48 +108,80 @@ public class ShopcartServiceImpl implements ShopcartService {
 
         shopCartMapper.insertItem(shoppingCart);
         dishMapper.RemoveOneSpecialDish(dishId);
+    }
 
-        return true;
+    private BlockingQueue<ShoppingCartDTO> orderQueue = new ArrayBlockingQueue<>(1024 * 1024);
+    private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+    @PostConstruct
+    private void Init() {
+        executorService.submit(new SpecialDishHandler());
+    }
+
+    private class SpecialDishHandler implements Runnable {
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    ShoppingCartDTO item = orderQueue.take();
+
+                    RLock lock =  redisson.getLock("order:" + TEST_USER_ID);
+                    boolean res = lock.tryLock();
+
+                    if (!res) {
+                        return;
+                    }
+
+                    try {
+                        shopcartService.AddSpecialIntoCart(item);
+                    }finally {
+                        lock.unlock();
+                    }
+                } catch (InterruptedException e) {
+                    log.error("error", e);
+                }
+            }
+        }
     }
 
 
-    @Transactional
     public boolean AddSpecial(ShoppingCartDTO item) {
-        Long dishId = item.getDishId() == null ? item.getSetmealId() : item.getDishId();
-        SpecialDish specialDish = new SpecialDish();
-        specialDish.setId(dishId);
-        specialDish = dishMapper.HasStock(specialDish);
+//
+//        if (specialDish == null) {
+//            return false;
+//        }
+//
+//
+//        LocalDateTime begin = specialDish.getBeginTime();
+//        LocalDateTime end = specialDish.getEndTime();
+//        int stock = specialDish.getStock();
+//
+//
+//        if (begin.isAfter(LocalDateTime.now()) || end.isBefore(LocalDateTime.now())) {
+//            return false;
+//        }
+//
+//        if (stock <= 0) {
+//            return false;
+//        }
+//        RedisLock redisLock = new RedisLock("order:" + TEST_USER_ID, redisTemplate);
 
-        if (specialDish == null) {
+        Long result = (Long)redisTemplate.execute(
+                SECKILL_SCRIPT,
+                Collections.emptyList(),
+                item.getDishId().toString(),
+                TEST_USER_ID.toString()
+        );
+
+        int trueRes = result.intValue();
+
+        if (trueRes != 0) {
             return false;
         }
 
+        orderQueue.add(item);
 
-        LocalDateTime begin = specialDish.getBeginTime();
-        LocalDateTime end = specialDish.getEndTime();
-        int stock = specialDish.getStock();
-        int pay = specialDish.getPayVal();
-
-
-        if (begin.isAfter(LocalDateTime.now()) || end.isBefore(LocalDateTime.now())) {
-            return false;
-        }
-
-        if (stock <= 0) {
-            return false;
-        }
-        RedisLock redisLock = new RedisLock("order:" + TEST_USER_ID, redisTemplate);
-        boolean res = redisLock.TryLock(5L);
-
-        if (!res) {
-            return false;
-        }
-
-        try {
-            return AddSpecialIntoCart(item, pay);
-        }finally {
-            redisLock.unLock();
-        }
+        return true;
     }
 
     public void RemoveOne(Long id) {

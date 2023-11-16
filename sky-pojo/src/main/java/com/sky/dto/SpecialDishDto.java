@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class SpecialDishDto implements Serializable {
+    private Long id;
     private Integer stock;
     private String description;
     private Integer pay_val;

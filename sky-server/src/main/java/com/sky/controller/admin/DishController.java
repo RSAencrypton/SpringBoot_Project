@@ -3,6 +3,7 @@ package com.sky.controller.admin;
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.dto.SpecialDishDto;
+import com.sky.entity.SpecialDish;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
 import com.sky.result.Result;
