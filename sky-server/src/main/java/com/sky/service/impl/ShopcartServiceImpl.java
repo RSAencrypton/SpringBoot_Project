@@ -1,11 +1,14 @@
 package com.sky.service.impl;
 
+import com.fasterxml.jackson.databind.util.BeanUtil;
 import com.sky.context.BaseContext;
 import com.sky.dto.ShoppingCartDTO;
 import com.sky.dto.SpecialDishDto;
 import com.sky.entity.Dish;
 import com.sky.entity.ShoppingCart;
 import com.sky.entity.SpecialDish;
+import com.sky.entity.SpecialOrder;
+import com.sky.idGenerator.IdGeneratorUtil;
 import com.sky.lock.RedisLock;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.ShopCartMapper;
@@ -18,6 +21,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -25,9 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -51,7 +57,10 @@ public class ShopcartServiceImpl implements ShopcartService {
     private RedissonClient redisson;
 
     @Autowired
-    private ShopcartServiceImpl shopcartService;
+    private ShopcartService shopcartService;
+
+    @Autowired
+    private IdGeneratorUtil idGeneratorUtil;
 
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
     static {
@@ -86,13 +95,12 @@ public class ShopcartServiceImpl implements ShopcartService {
     }
 
     @Transactional
-    public void AddSpecialIntoCart(ShoppingCartDTO item) {
+    public void AddSpecialIntoCart(SpecialOrder item) {
         ShoppingCart shoppingCart = new ShoppingCart();
-        BeanUtils.copyProperties(item, shoppingCart);
-        shoppingCart.setUserId(TEST_USER_ID);
+        shoppingCart.setUserId(item.getUserId());
 
 
-        Long dishId = item.getDishId();
+        Long dishId = item.getVoucherId();
         Dish dish = dishMapper.FindDishById(dishId);
 
         SpecialDish specialDish = new SpecialDish();
@@ -110,7 +118,7 @@ public class ShopcartServiceImpl implements ShopcartService {
         dishMapper.RemoveOneSpecialDish(dishId);
     }
 
-    private BlockingQueue<ShoppingCartDTO> orderQueue = new ArrayBlockingQueue<>(1024 * 1024);
+
     private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     @PostConstruct
@@ -119,33 +127,75 @@ public class ShopcartServiceImpl implements ShopcartService {
     }
 
     private class SpecialDishHandler implements Runnable {
+        String QueueName = "stream.orders";
         @Override
         public void run() {
             while (true) {
                 try {
-                    ShoppingCartDTO item = orderQueue.take();
+                    List<MapRecord<String, Object, Object>> read = redisTemplate.opsForStream().read(
+                            Consumer.from("g1", "c1"),
+                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+                            StreamOffset.create(QueueName, ReadOffset.lastConsumed())
+                    );
 
-                    RLock lock =  redisson.getLock("order:" + TEST_USER_ID);
-                    boolean res = lock.tryLock();
+                    if (read == null || read.isEmpty()) {
+                        continue;
+                    }
+                    MapRecord<String, Object, Object> record = read.get(0);
+                    Map<Object, Object> values = record.getValue();
+                    SpecialOrder item = new SpecialOrder();
 
-                    if (!res) {
-                        return;
+                    if (values.containsKey("userId")) {
+                        item.setUserId(Long.valueOf(values.get("userId").toString()));
+                    }
+                    if (values.containsKey("voucherId")) {
+                        item.setVoucherId(Long.valueOf(values.get("voucherId").toString()));
                     }
 
-                    try {
-                        shopcartService.AddSpecialIntoCart(item);
-                    }finally {
-                        lock.unlock();
+                    AddSpecialIntoCart(item);
+                    redisTemplate.opsForStream().acknowledge(QueueName, "g1", record.getId());
+                }catch (Exception e) {
+                    log.error("特价商品处理失败", e);
+                    HandlePendingList();
+                }
+            }
+        }
+
+        private void HandlePendingList() {
+            while (true) {
+                try {
+                    List<MapRecord<String, Object, Object>> read = redisTemplate.opsForStream().read(
+                            Consumer.from("g1", "c1"),
+                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+                            StreamOffset.create(QueueName, ReadOffset.from("0"))
+                    );
+
+                    if (read == null || read.isEmpty()) {
+                        break;
                     }
-                } catch (InterruptedException e) {
-                    log.error("error", e);
+
+                    MapRecord<String, Object, Object> record = read.get(0);
+                    Map<Object, Object> values = record.getValue();
+                    SpecialOrder item = new SpecialOrder();
+
+                    if (values.containsKey("userId")) {
+                        item.setUserId(Long.valueOf(values.get("userId").toString()));
+                    }
+                    if (values.containsKey("voucherId")) {
+                        item.setVoucherId(Long.valueOf(values.get("voucherId").toString()));
+                    }
+
+                    AddSpecialIntoCart(item);
+                    redisTemplate.opsForStream().acknowledge(QueueName, "g1", record.getId());
+                }catch (Exception e) {
+                    log.error("pending-list处理失败", e);
                 }
             }
         }
     }
 
 
-    public boolean AddSpecial(ShoppingCartDTO item) {
+    public Long AddSpecial(ShoppingCartDTO item) {
 //
 //        if (specialDish == null) {
 //            return false;
@@ -166,6 +216,7 @@ public class ShopcartServiceImpl implements ShopcartService {
 //        }
 //        RedisLock redisLock = new RedisLock("order:" + TEST_USER_ID, redisTemplate);
 
+        Long orderId = idGeneratorUtil.nextId("order");
         Long result = (Long)redisTemplate.execute(
                 SECKILL_SCRIPT,
                 Collections.emptyList(),
@@ -176,12 +227,10 @@ public class ShopcartServiceImpl implements ShopcartService {
         int trueRes = result.intValue();
 
         if (trueRes != 0) {
-            return false;
+            return null;
         }
 
-        orderQueue.add(item);
-
-        return true;
+        return orderId;
     }
 
     public void RemoveOne(Long id) {

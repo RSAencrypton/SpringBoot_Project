@@ -2,6 +2,7 @@ package com.sky.controller.user;
 
 import com.sky.dto.ShoppingCartDTO;
 import com.sky.entity.ShoppingCart;
+import com.sky.idGenerator.IdGeneratorUtil;
 import com.sky.result.Result;
 import com.sky.service.ShopcartService;
 import io.swagger.annotations.Api;
@@ -21,6 +22,7 @@ public class ShopCartController {
     @Autowired
     private ShopcartService shopcartService;
 
+
     @PostMapping("/add")
     @ApiOperation("添加购物车")
     public Result AddCart(@RequestBody ShoppingCartDTO item) {
@@ -31,8 +33,8 @@ public class ShopCartController {
     @PostMapping("/addSpecial")
     @ApiOperation("添加特价商品到购物车")
     public Result AddSpecial(@RequestBody ShoppingCartDTO item) {
-        boolean res =  shopcartService.AddSpecial(item);
-        return res == true ? Result.success("抢购成功") : Result.error("抢购失败");
+        Long res =  shopcartService.AddSpecial(item);
+        return res != null ? Result.success(res) : Result.error("抢购失败");
     }
 
     @PostMapping("/removeOne/{Dishid}")
