@@ -1,12 +1,11 @@
 package com.sky.controller.user;
 
+import cn.hutool.json.JSONUtil;
 import com.alibaba.druid.support.json.JSONUtils;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+
+import com.google.gson.Gson;
 import com.sky.constant.RedisConstants;
-import com.sky.dto.DishDTO;
-import com.sky.dto.DishPageQueryDTO;
-import com.sky.result.PageResult;
+
 import com.sky.result.Result;
 import com.sky.service.DishService;
 import com.sky.utils.RedisData;
@@ -15,11 +14,13 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.BooleanUtils;
-import org.redisson.api.RedissonClient;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
+
+import org.springframework.boot.autoconfigure.cache.CacheProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,16 +43,20 @@ public class DishController {
 
 
 
+
     @GetMapping("/{id}")
     @ApiOperation("根据分类id查询菜品")
 //    @Cacheable(cacheNames = "dish", key = "#id")
     public Result<List<DishVO>> FindDishById(@PathVariable Long id) {
-        List<DishVO> dishVOs = QueryWithLogicalExpire(id);
+        List<DishVO> dishVOs = null;
+
+        if (dishService.MightHasThisDish(id)) {
+            dishVOs = QueryWithLogicalExpire(id);
+        }
 
         return dishVOs == null ? Result.error("没有此分类") : Result.success(dishVOs);
     }
 
-    //TODO: 缓存策略需要修改
     public List<DishVO> CachePassThrough(Long id) {
         String key = "dish_" + id;
         List<DishVO> dishVOs = (List<DishVO>)redisTemplate.opsForValue().get(key);
@@ -93,7 +98,8 @@ public class DishController {
 
     public List<DishVO> QueryWithLogicalExpire(Long id) {
         String key = "dish_" + id;
-        RedisData data = (RedisData)redisTemplate.opsForValue().get(key);
+        String obj = (String) redisTemplate.opsForValue().get(key);
+        RedisData data = JSONUtil.toBean(obj, RedisData.class);
 
         if (data == null) {
             return SaveDishVO2RedisData(id);
@@ -127,7 +133,7 @@ public class DishController {
         RedisData redisData = new RedisData();
         redisData.setData(dishVOs);
         redisData.setExpireTime(LocalDateTime.now().plusMinutes(5));
-        redisTemplate.opsForValue().set(key, redisData);
+        redisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
 
         return dishVOs;
     }

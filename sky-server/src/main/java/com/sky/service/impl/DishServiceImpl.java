@@ -2,6 +2,8 @@ package com.sky.service.impl;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.sky.constant.MessageConstant;
 import com.sky.constant.RedisConstants;
 import com.sky.constant.StatusConstant;
@@ -28,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import javax.annotation.PostConstruct;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -51,6 +54,24 @@ public class DishServiceImpl implements DishService {
     @Autowired
     private RedisTemplate redisTemplate;
 
+    private BloomFilter<Long> filter = BloomFilter.create(
+            Funnels.longFunnel(),
+            10000,
+            0.01
+    );
+
+    @PostConstruct
+    private void Init() {
+        List<Long> ids = dishMapper.GetAllDishId();
+        for (Long id : ids) {
+            filter.put(id);
+        }
+    }
+
+    public boolean MightHasThisDish(Long id) {
+        return filter.mightContain(id);
+    }
+
     @Transactional
     public void AddDish(DishDTO item) {
         Dish dish = new Dish();
@@ -67,6 +88,7 @@ public class DishServiceImpl implements DishService {
             flavourMapper.InsertAllFlavour(flavors);
         }
     }
+
 
     public void AddSpecialDish(SpecialDishDto item) {
         dishMapper.AddSpecialDish(item);

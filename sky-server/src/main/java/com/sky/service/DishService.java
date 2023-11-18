@@ -23,4 +23,6 @@ public interface DishService {
     List<DishVO> GetDishByCategoryId(Long id);
 
     void AddSpecialDish(SpecialDishDto item);
+
+    boolean MightHasThisDish(Long id);
 }
