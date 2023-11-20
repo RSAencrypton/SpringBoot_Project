@@ -17,6 +17,12 @@ spring:
     port: ${sky.redis.port}
     password: ${sky.redis.password}
     database: ${sky.redis.database}
+#    sentinel:
+#      master: mymaster
+#      nodes:
+#        - 127.0.0.1:27001
+#        - 127.0.0.1:27002
+#        - 127.0.0.1:27003
 
 mybatis:
   #mapper配置文件
