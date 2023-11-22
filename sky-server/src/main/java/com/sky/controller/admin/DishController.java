@@ -1,8 +1,10 @@
 package com.sky.controller.admin;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.dto.SpecialDishDto;
+import com.sky.entity.Dish;
 import com.sky.entity.SpecialDish;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
@@ -31,6 +33,9 @@ public class DishController {
     @Autowired
     private RedisTemplate redisTemplate;
 
+    @Autowired
+    private Cache<Long, DishVO> dishCache;
+
     @PostMapping
     @CacheEvict(cacheNames = "dish", key = "#item.getCategoryId()")
     public Result AddDish(@RequestBody DishDTO item) {
@@ -57,8 +62,11 @@ public class DishController {
     @GetMapping("/{id}")
     @ApiOperation("根据id查询菜品")
     public Result<DishVO> FindDishById(@PathVariable Long id) {
-        DishVO dishVO = dishService.GetDishById(id);
-        return Result.success(dishVO);
+        return Result.success(dishCache.get(id, key ->
+                dishService.GetDishById(id)
+        ));
+//        DishVO dishVO = dishService.GetDishById(id);
+//        return Result.success(dishVO);
     }
 
     @PutMapping
