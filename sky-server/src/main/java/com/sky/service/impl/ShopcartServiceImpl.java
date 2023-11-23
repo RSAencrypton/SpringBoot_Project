@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -38,6 +39,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 @Service
@@ -120,17 +122,23 @@ public class ShopcartServiceImpl implements ShopcartService {
 
 
     private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean running = new AtomicBoolean(true);
 
     @PostConstruct
     private void Init() {
         executorService.submit(new SpecialDishHandler());
     }
 
+    @PreDestroy
+    private void OnExit() {
+        running.set(false);
+    }
+
     private class SpecialDishHandler implements Runnable {
         String QueueName = "stream.orders";
         @Override
         public void run() {
-            while (true) {
+            while (running.get()) {
                 try {
                     List<MapRecord<String, Object, Object>> read = redisTemplate.opsForStream().read(
                             Consumer.from("g1", "c1"),
@@ -152,7 +160,7 @@ public class ShopcartServiceImpl implements ShopcartService {
                         item.setVoucherId(Long.valueOf(values.get("voucherId").toString()));
                     }
 
-                    AddSpecialIntoCart(item);
+                    shopcartService.AddSpecialIntoCart(item);
                     redisTemplate.opsForStream().acknowledge(QueueName, "g1", record.getId());
                 }catch (Exception e) {
                     log.error("特价商品处理失败", e);
@@ -162,7 +170,7 @@ public class ShopcartServiceImpl implements ShopcartService {
         }
 
         private void HandlePendingList() {
-            while (true) {
+            while (running.get()) {
                 try {
                     List<MapRecord<String, Object, Object>> read = redisTemplate.opsForStream().read(
                             Consumer.from("g1", "c1"),
@@ -185,7 +193,7 @@ public class ShopcartServiceImpl implements ShopcartService {
                         item.setVoucherId(Long.valueOf(values.get("voucherId").toString()));
                     }
 
-                    AddSpecialIntoCart(item);
+                    shopcartService.AddSpecialIntoCart(item);
                     redisTemplate.opsForStream().acknowledge(QueueName, "g1", record.getId());
                 }catch (Exception e) {
                     log.error("pending-list处理失败", e);
